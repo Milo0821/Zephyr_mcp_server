@@ -49,7 +49,7 @@ export interface UpdateBddArgs {
 export interface FolderArgs {
   project_key: string;
   name: string;
-  parent_folder_path?: string;
+  parent_folder_path?: string; // For Cloud: folder path string; For Data Center: numeric folder ID
   folder_type?: 'TEST_CASE' | 'TEST_PLAN' | 'TEST_RUN';
 }
 

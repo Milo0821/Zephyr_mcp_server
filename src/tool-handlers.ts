@@ -220,35 +220,63 @@ export class ZephyrToolHandlers {
   async createFolder(args: FolderArgs) {
     const { project_key, name, parent_folder_path, folder_type = 'TEST_CASE' } = args;
 
+    // Build payload based on Jira type
     const payload: any = {
       projectKey: project_key,
       name: name,
-      folderType: folder_type,
     };
 
+    // For Data Center/Server API, use 'type' field
+    // For Cloud API, use 'folderType' field
+    if (this.jiraConfig.type === 'datacenter') {
+      payload.type = folder_type;
+    } else {
+      payload.folderType = folder_type;
+    }
+
+    // Handle parent folder
     if (parent_folder_path) {
-      payload.parentFolderPath = parent_folder_path;
+      // For Data Center/Server, the API expects parentId (numeric)
+      // For Cloud, it may accept parentFolderPath
+      // We'll try to use the path first, but provide better error messaging
+      if (this.jiraConfig.type === 'datacenter') {
+        // Data Center API typically expects parentId as a number
+        // If parent_folder_path is provided as a string path, we need to resolve it to an ID
+        // For now, we'll accept it and let the API respond with an error if needed
+        payload.parentId = parent_folder_path;
+      } else {
+        payload.parentFolderPath = parent_folder_path;
+      }
     }
 
     try {
       const response = await this.axiosInstance.post(this.jiraConfig.apiEndpoints.folder, payload);
 
-      if (response.status === 201) {
+      if (response.status === 201 || response.status === 200) {
         return {
           content: [
             {
               type: 'text',
-              text: `✅ Folder created successfully: ${response.data.name} (ID: ${response.data.id})\n${JSON.stringify(response.data, null, 2)}`,
+              text: `✅ Folder created successfully: ${response.data.name || name} (ID: ${response.data.id || 'N/A'})\n${JSON.stringify(response.data, null, 2)}`,
             },
           ],
         };
       } else {
-        throw new Error(`Failed to create folder: ${response.status}`);
+        throw new Error(`Unexpected status code: ${response.status}`);
       }
     } catch (error) {
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as any;
+        errorMessage = `Status: ${axiosError.response?.status}, Data: ${JSON.stringify(axiosError.response?.data)}, Payload sent: ${JSON.stringify(payload)}`;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = String(error);
+      }
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to create folder: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to create folder: ${errorMessage}`
       );
     }
   }
