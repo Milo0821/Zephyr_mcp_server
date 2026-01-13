@@ -1,6 +1,6 @@
 {
   "name": "zephyr-scale-mcp-server",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Model Context Protocol (MCP) server for Zephyr Scale test case management with comprehensive STEP_BY_STEP, PLAIN_TEXT, and BDD support",
   "type": "module",
   "main": "./build/index.js",
