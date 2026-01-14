@@ -182,11 +182,7 @@ export const toolSchemas = [
         },
         name: {
           type: 'string',
-          description: 'Folder name (required)',
-        },
-        parent_folder_path: {
-          type: 'string',
-          description: 'Parent folder path (optional)',
+          description: 'Full folder path including parent folders (required). Examples: "/MyFolder" for root folder, "/Parent/Child" for nested folder',
         },
         folder_type: {
           type: 'string',

@@ -48,8 +48,7 @@ export interface UpdateBddArgs {
 
 export interface FolderArgs {
   project_key: string;
-  name: string;
-  parent_folder_path?: string; // For Cloud: folder path string; For Data Center: numeric folder ID
+  name: string; // Full folder path including parent folders (e.g., "/folder/subfolder")
   folder_type?: 'TEST_CASE' | 'TEST_PLAN' | 'TEST_RUN';
 }
 

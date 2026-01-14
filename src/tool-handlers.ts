@@ -218,36 +218,17 @@ export class ZephyrToolHandlers {
   }
 
   async createFolder(args: FolderArgs) {
-    const { project_key, name, parent_folder_path, folder_type = 'TEST_CASE' } = args;
+    const { project_key, name, folder_type = 'TEST_CASE' } = args;
 
-    // Build payload based on Jira type
+    // According to Zephyr Scale API documentation:
+    // - projectKey: Project key (required)
+    // - name: Full folder path including parent folders (e.g., "/folder/subfolder")
+    // - type: Folder type (TEST_CASE, TEST_PLAN, or TEST_RUN)
     const payload: any = {
       projectKey: project_key,
       name: name,
+      type: folder_type
     };
-
-    // For Data Center/Server API, use 'type' field
-    // For Cloud API, use 'folderType' field
-    if (this.jiraConfig.type === 'datacenter') {
-      payload.type = folder_type;
-    } else {
-      payload.folderType = folder_type;
-    }
-
-    // Handle parent folder
-    if (parent_folder_path) {
-      // For Data Center/Server, the API expects parentId (numeric)
-      // For Cloud, it may accept parentFolderPath
-      // We'll try to use the path first, but provide better error messaging
-      if (this.jiraConfig.type === 'datacenter') {
-        // Data Center API typically expects parentId as a number
-        // If parent_folder_path is provided as a string path, we need to resolve it to an ID
-        // For now, we'll accept it and let the API respond with an error if needed
-        payload.parentId = parent_folder_path;
-      } else {
-        payload.parentFolderPath = parent_folder_path;
-      }
-    }
 
     try {
       const response = await this.axiosInstance.post(this.jiraConfig.apiEndpoints.folder, payload);
