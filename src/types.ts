@@ -40,10 +40,10 @@ export interface TestCaseArgs {
   parameters?: TestParameters;
 }
 
-
 export interface UpdateBddArgs {
   test_case_key: string;
   bdd_content: string;
+  name?: string;
 }
 
 export interface FolderArgs {

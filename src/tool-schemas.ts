@@ -154,7 +154,7 @@ export const toolSchemas = [
   },
   {
     name: 'update_test_case_bdd',
-    description: 'Update an existing test case with BDD content',
+    description: 'Update an existing test case with BDD content. Optionally update the test case name. Unspecified fields are preserved.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -162,9 +162,13 @@ export const toolSchemas = [
           type: 'string',
           description: 'Test case key to update',
         },
+        name: {
+          type: 'string',
+          description: 'New test case name (optional)',
+        },
         bdd_content: {
           type: 'string',
-          description: 'BDD content in markdown format',
+          description: 'BDD content in markdown format (will be converted to Gherkin when possible)',
         },
       },
       required: ['test_case_key', 'bdd_content'],

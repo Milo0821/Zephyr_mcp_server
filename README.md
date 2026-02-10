@@ -82,7 +82,7 @@ The server provides access to various resources through URI schemes:
 - `get_test_case`: Get detailed information about a specific test case.
 - `create_test_case`: Create test cases with STEP_BY_STEP, PLAIN_TEXT, or BDD content.
 - `delete_test_case`: Delete a specific test case.
-- `update_test_case_bdd`: Update an existing test case with BDD content.
+- `update_test_case_bdd`: Update an existing test case with BDD content (optionally update the test case name).
 
 ### Test Run Management
 - `create_test_run`: Create a new test run.
@@ -125,6 +125,16 @@ The server provides access to various resources through URI schemes:
   "test_case_keys": ["PROJ-T123", "PROJ-T124", "PROJ-T125"]
 }
 ```
+
+### Update an Existing BDD Test Case
+```json
+{
+  "test_case_key": "PROJ-T123",
+  "name": "Ensure the axial-flow pump is enabled",
+  "bdd_content": "Feature: Pump Enablement\n\nScenario: Enable the pump\n  Given the system is powered on\n  When the operator enables the axial-flow pump\n  Then the pump should report as enabled"
+}
+```
+**Note**: The server will convert markdown-style BDD into Gherkin when possible and will preserve all other existing test case fields.
 
 ## Authentication
 

@@ -46,25 +46,54 @@ npm run test:integration
 
 ## Environment Setup for Full Testing
 
-To run tests that require API access, set these environment variables:
+The test suite includes an integration check that requires `ZEPHYR_BASE_URL` to be set.
+For live server startup / tools list checks, you also need valid authentication.
+
+To run the full test suite successfully, set at least:
+
+```bash
+export ZEPHYR_BASE_URL="https://your-jira-instance.atlassian.net"
+```
+
+For live API/server checks, also set credentials (one of the following):
+
+**Jira Cloud:**
+
+```bash
+export JIRA_USERNAME="your-email@example.com"
+export JIRA_API_TOKEN="your-api-token"
+```
+
+**Jira Data Center:**
 
 ```bash
 export ZEPHYR_API_KEY="your-zephyr-scale-api-token"
-export ZEPHYR_BASE_URL="https://your-jira-instance.atlassian.net"
 ```
 
 ## Expected Test Results
 
-### Without API Credentials
+### Without Any Environment Variables
 - ✅ Package Configuration: PASSED
 - ✅ Build Artifacts: PASSED
-- ❌ Environment Configuration: FAILED (expected - no credentials)
-- ❌ Server Startup: FAILED (expected - needs credentials)
-- ❌ Tools List: FAILED (expected - server can't start)
+- ✅ Environment Configuration: PASSED (no vars set)
+- ✅ Server Startup: SKIPPED
+- ✅ Tools List: SKIPPED
+- ❌ API Connectivity: FAILED (`ZEPHYR_BASE_URL` not configured)
 
-### With Valid API Credentials
+If you want tests to pass without configuring Jira, run unit tests only:
+
+```bash
+npm run test:unit
+```
+
+### With `ZEPHYR_BASE_URL` Set
 - ✅ All unit tests should pass
-- ✅ All integration tests should pass
+- ✅ Integration tests should pass
+
+### With Full Valid API Credentials
+- ✅ All unit tests should pass
+- ✅ Server startup and tools list checks should run (not skipped)
+- ✅ Integration tests should pass
 
 ## Test Output Example
 

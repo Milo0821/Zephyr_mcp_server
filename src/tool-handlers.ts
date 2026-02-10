@@ -135,12 +135,13 @@ export class ZephyrToolHandlers {
   }
 
   async updateTestCaseBdd(args: UpdateBddArgs) {
-    const { test_case_key, bdd_content } = args;
+    const { test_case_key, bdd_content, name } = args;
 
     try {
       // First, get the existing test case data
       const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
       const testCaseData = getResponse.data;
+
       // Convert incoming BDD markdown (fallback to raw content if conversion returns empty)
       const converted = convertToGherkin(bdd_content);
       const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
@@ -162,6 +163,11 @@ export class ZephyrToolHandlers {
           throw new McpError(ErrorCode.InternalError, `Existing test case is missing required field '${field}' needed for update.`);
         }
         payload[field] = value;
+      }
+
+      // Optional name update
+      if (typeof name === 'string' && name.trim().length > 0) {
+        payload.name = name;
       }
 
       // Optional simple scalar/string fields
@@ -202,7 +208,7 @@ export class ZephyrToolHandlers {
           content: [
             {
               type: 'text',
-              text: `✅ Updated ${test_case_key} with BDD content successfully\nPayload summary: ${JSON.stringify({ textLength: finalText.length, projectKey: payload.projectKey, preservedLabels: payload.labels?.length || 0 }, null, 2)}`,
+              text: `✅ Updated ${test_case_key} with BDD content successfully\nPayload summary: ${JSON.stringify({ textLength: finalText.length, projectKey: payload.projectKey, name: payload.name, preservedLabels: payload.labels?.length || 0 }, null, 2)}`,
             },
           ],
         };
