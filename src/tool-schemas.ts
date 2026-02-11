@@ -273,6 +273,15 @@ export const toolSchemas = [
           type: 'string',
           description: 'Test environment (optional)',
         },
+        issue_key: {
+          type: 'string',
+          description: 'Single issue key to link to the test run (optional) - will be mapped to issueKey in API',
+        },
+        issue_links: {
+          type: 'array',
+          description: 'Array of issue links (optional) - will be mapped to issueLinks in API',
+          items: { type: 'string' },
+        },
         custom_fields: {
           type: 'object',
           description: 'Custom fields object (optional)',

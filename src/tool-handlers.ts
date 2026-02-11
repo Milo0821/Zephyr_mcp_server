@@ -312,6 +312,8 @@ export class ZephyrToolHandlers {
       description,
       owner,
       environment,
+      issue_key,
+      issue_links,
       custom_fields
     } = args;
 
@@ -333,6 +335,8 @@ export class ZephyrToolHandlers {
     if (description) payload.description = description;
     if (owner) payload.owner = owner;
     if (environment) payload.environment = environment;
+    if (issue_key) payload.issueKey = issue_key;
+    if (issue_links && issue_links.length > 0) payload.issueLinks = issue_links;
     if (custom_fields) payload.customFields = custom_fields;
     if (test_plan_key) payload.testPlanKey = test_plan_key;
 

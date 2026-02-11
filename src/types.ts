@@ -63,6 +63,8 @@ export interface TestRunArgs {
   description?: string;
   owner?: string;
   environment?: string;
+  issue_key?: string;
+  issue_links?: string[];
   custom_fields?: Record<string, any>;
 }
 
