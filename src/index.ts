@@ -25,7 +25,7 @@ class ZephyrServer {
     this.server = new Server(
       {
         name: 'zephyr-server',
-        version: '0.2.9',
+        version: '0.3.0',
       },
       {
         capabilities: {
@@ -83,6 +83,8 @@ class ZephyrServer {
             return await this.toolHandlers.getTestExecution(args);
           case 'search_test_cases_by_folder':
             return await this.toolHandlers.searchTestCasesByFolder(args as any);
+          case 'search_test_runs':
+            return await this.toolHandlers.searchTestRuns(args as any);
           case 'add_test_cases_to_run':
             return await this.toolHandlers.addTestCasesToRun(args as any);
           default:

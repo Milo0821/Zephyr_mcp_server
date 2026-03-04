@@ -7,6 +7,7 @@ import {
   TestRunArgs,
   SearchTestCasesArgs,
   AddTestCasesToRunArgs,
+  SearchTestRunsArgs,
   JiraConfig
 } from './types.js';
 import { convertToGherkin, customPriorityMapping, priorityMapping } from './utils.js';
@@ -539,6 +540,71 @@ export class ZephyrToolHandlers {
         ErrorCode.InternalError,
         `Failed to search test cases by folder: ${errorMessage}`
       );
+    }
+  }
+
+  async searchTestRuns(args: SearchTestRunsArgs) {
+    const { project_key, folder, max_results = 200, fields } = args;
+
+    // Build query string per Zephyr Scale API docs
+    const queryParts: string[] = [];
+    if (project_key) queryParts.push(`projectKey = "${project_key}"`);
+    if (folder) queryParts.push(`folder = "${folder}"`);
+
+    if (queryParts.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, 'At least one of project_key or folder must be provided.');
+    }
+
+    const query = queryParts.join(' AND ');
+    const params: Record<string, any> = { query, maxResults: max_results };
+    if (fields) params.fields = fields;
+
+    const searchEndpoint = this.jiraConfig.type === 'cloud'
+      ? '/testruns/search'
+      : '/rest/atm/1.0/testrun/search';
+
+    try {
+      const response = await this.axiosInstance.get(searchEndpoint, { params });
+
+      let testRuns: any[] = [];
+      if (Array.isArray(response.data)) {
+        testRuns = response.data;
+      } else if (response.data.values && Array.isArray(response.data.values)) {
+        testRuns = response.data.values;
+      } else if (response.data.results && Array.isArray(response.data.results)) {
+        testRuns = response.data.results;
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ Found ${testRuns.length} test run(s) matching query "${query}":\n${JSON.stringify({
+              query,
+              totalCount: testRuns.length,
+              testRuns: testRuns.map((tr: any) => ({
+                key: tr.key,
+                name: tr.name,
+                status: tr.status,
+                folder: tr.folder,
+                testCaseCount: tr.testCaseCount,
+                issueKey: tr.issueKey,
+              }))
+            }, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as any;
+        errorMessage = `Status: ${axiosError.response?.status}, Data: ${JSON.stringify(axiosError.response?.data)}`;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = String(error);
+      }
+      throw new McpError(ErrorCode.InternalError, `Failed to search test runs: ${errorMessage}`);
     }
   }
 

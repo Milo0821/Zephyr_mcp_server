@@ -348,6 +348,32 @@ export const toolSchemas = [
     },
   },
   {
+    name: 'search_test_runs',
+    description: 'Search for test runs using a query. Supports filtering by projectKey and/or folder path.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_key: {
+          type: 'string',
+          description: 'Project key to filter by (e.g., "PROJ"). Can be a single key or omitted if using folder only.',
+        },
+        folder: {
+          type: 'string',
+          description: 'Folder path to filter test runs by (e.g., "/MyFolder/SubFolder")',
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of results to return (optional, default 200)',
+          default: 200,
+        },
+        fields: {
+          type: 'string',
+          description: 'Comma-separated list of fields to include in the response (optional, e.g., "key,name,status,folder"). If not set, all fields are returned.',
+        },
+      },
+    },
+  },
+  {
     name: 'add_test_cases_to_run',
     description: 'Add test cases to an existing test run',
     inputSchema: {

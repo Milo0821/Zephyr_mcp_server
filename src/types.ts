@@ -79,6 +79,13 @@ export interface AddTestCasesToRunArgs {
   test_case_keys: string[];
 }
 
+export interface SearchTestRunsArgs {
+  project_key?: string;
+  folder?: string;
+  max_results?: number;
+  fields?: string;
+}
+
 export type JiraType = 'cloud' | 'datacenter';
 
 export interface ApiEndpoints {
