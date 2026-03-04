@@ -68,7 +68,7 @@ The server automatically detects your Jira environment and uses the appropriate 
 - **Jira Cloud**: Uses Zephyr Scale API v2.
 - **Jira Data Center**: Uses Zephyr Scale API v1.
 
-This may result in slightly different behavior for some tools, such as `add_test_cases_to_run`.
+Some tools are platform-specific. For example, `add_test_cases_to_run` is only available on Cloud, as the Data Center API (v1) does not support modifying test runs after creation.
 
 ### Resource System
 The server provides access to various resources through URI schemes:
@@ -88,11 +88,12 @@ The server provides access to various resources through URI schemes:
 - `create_test_run`: Create a new test run.
 - `get_test_run`: Get detailed information about a specific test run.
 - `get_test_run_cases`: Get test case keys from a test run.
-- `add_test_cases_to_run`: Add test cases to an existing test run.
+- `add_test_cases_to_run`: Add test cases to an existing test run. *(Cloud only)*
 
 ### Test Execution & Search
 - `get_test_execution`: Get detailed individual test execution results.
 - `search_test_cases_by_folder`: Search for test cases in a specific folder.
+- `search_test_runs`: Search for test runs by project key and/or folder path.
 
 ### Organization
 - `create_folder`: Create a new folder in Zephyr Scale.

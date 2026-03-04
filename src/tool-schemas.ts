@@ -375,7 +375,7 @@ export const toolSchemas = [
   },
   {
     name: 'add_test_cases_to_run',
-    description: 'Add test cases to an existing test run',
+    description: 'Add test cases to an existing test run (Cloud only — not supported on Data Center)',
     inputSchema: {
       type: 'object',
       properties: {

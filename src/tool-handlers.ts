@@ -611,49 +611,23 @@ export class ZephyrToolHandlers {
   async addTestCasesToRun(args: AddTestCasesToRunArgs) {
     const { test_run_key, test_case_keys } = args;
 
+    if (this.jiraConfig.type === 'datacenter') {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        'add_test_cases_to_run is only supported on Zephyr Scale Cloud. The Data Center API (v1) does not provide an endpoint to modify test runs after creation.'
+      );
+    }
+
     try {
-      // For Data Center, we need to get the current items and then update
-      if (this.jiraConfig.type === 'datacenter') {
-        const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testrun}/${test_run_key}`);
-        const existingItems = getResponse.data.items || [];
-        const existingKeys = new Set(existingItems.map((item: any) => item.testCaseKey));
+      const payload = {
+        items: test_case_keys.map(key => ({ testCaseKey: key }))
+      };
+      const response = await this.axiosInstance.post(`/testcycles/${test_run_key}/testcases`, payload);
 
-        const newItems = test_case_keys
-          .filter(key => !existingKeys.has(key))
-          .map(key => ({ testCaseKey: key, testResultStatus: 'Not Executed' }));
-
-        if (newItems.length > 0) {
-          let response;
-          if (this.jiraConfig.type === 'datacenter') {
-            const minimalPayload = {
-              items: [...existingItems, ...newItems]
-            };
-            response = await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testrun}/${test_run_key}`, minimalPayload);
-          } else {
-            const postPayload = { items: newItems.map(item => item.testCaseKey) };
-            response = await this.axiosInstance.post(`${this.jiraConfig.apiEndpoints.testrun}/${test_run_key}/testcases`, postPayload);
-          }
-
-          if (response.status === 200 || response.status === 201 || response.status === 204) {
-            return {
-              content: [{ type: 'text', text: `Added ${newItems.length} new test cases to test run ${test_run_key}.` }],
-            };
-          }
-        } else {
-          return {
-            content: [{ type: 'text', text: 'All specified test cases are already in the test run.' }],
-          };
-        }
-      } else {
-        // For Cloud, we can just post the new test case keys
-        const fullPayload = { items: test_case_keys };
-        const response = await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testrun}/${test_run_key}`, fullPayload);
-
-        if (response.status === 200 || response.status === 204) {
-          return {
-            content: [{ type: 'text', text: `Successfully updated test cases for test run ${test_run_key}.` }],
-          };
-        }
+      if (response.status === 200 || response.status === 201 || response.status === 204) {
+        return {
+          content: [{ type: 'text', text: `Added ${test_case_keys.length} test case(s) to test run ${test_run_key}.` }],
+        };
       }
     } catch (error) {
       throw new McpError(ErrorCode.InternalError, `Failed to add test cases: ${error instanceof Error ? error.message : String(error)}`);
