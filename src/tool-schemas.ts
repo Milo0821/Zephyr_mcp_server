@@ -374,6 +374,20 @@ export const toolSchemas = [
     },
   },
   {
+    name: 'delete_test_run',
+    description: 'Delete a specific test run',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        test_run_key: {
+          type: 'string',
+          description: 'Test run key to delete (e.g., PROJ-R123)',
+        },
+      },
+      required: ['test_run_key'],
+    },
+  },
+  {
     name: 'add_test_cases_to_run',
     description: 'Add test cases to an existing test run (Cloud only — not supported on Data Center)',
     inputSchema: {

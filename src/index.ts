@@ -75,6 +75,8 @@ class ZephyrServer {
             return await this.toolHandlers.getTestRunCases(args);
           case 'delete_test_case':
             return await this.toolHandlers.deleteTestCase(args);
+          case 'delete_test_run':
+            return await this.toolHandlers.deleteTestRun(args);
           case 'create_test_run':
             return await this.toolHandlers.createTestRun(args as any);
           case 'get_test_run':

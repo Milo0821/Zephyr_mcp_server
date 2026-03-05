@@ -301,6 +301,25 @@ export class ZephyrToolHandlers {
     }
   }
 
+  async deleteTestRun(args: any) {
+    const { test_run_key } = args;
+    try {
+      const response = await this.axiosInstance.delete(`${this.jiraConfig.apiEndpoints.testrun}/${test_run_key}`);
+      if (response.status === 204) {
+        return {
+          content: [{ type: 'text', text: `Test run ${test_run_key} deleted successfully.` }],
+        };
+      } else {
+        return {
+          content: [{ type: 'text', text: `Failed to delete test run. Status: ${response.status}` }],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      throw new McpError(ErrorCode.InternalError, `Failed to delete test run: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   async createTestRun(args: TestRunArgs) {
     const {
       project_key,
