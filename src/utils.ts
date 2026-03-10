@@ -1,11 +1,11 @@
 export function convertToGherkin(bddContent: string): string {
   const bddLines: string[] = [];
   const lines = bddContent.split('\n');
-  
+
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (!trimmedLine || trimmedLine.startsWith('---')) continue;
-    
+
     if (trimmedLine.startsWith('**Given**')) {
       bddLines.push(`Given ${trimmedLine.replace('**Given**', '').trim()}`);
     } else if (trimmedLine.startsWith('**When**')) {
@@ -14,13 +14,13 @@ export function convertToGherkin(bddContent: string): string {
       bddLines.push(`Then ${trimmedLine.replace('**Then**', '').trim()}`);
     } else if (trimmedLine.startsWith('**And**')) {
       bddLines.push(`And ${trimmedLine.replace('**And**', '').trim()}`);
-    } else if (trimmedLine.startsWith('Given ') || trimmedLine.startsWith('When ') || 
-               trimmedLine.startsWith('Then ') || trimmedLine.startsWith('And ')) {
+    } else if (trimmedLine.startsWith('Given ') || trimmedLine.startsWith('When ') ||
+      trimmedLine.startsWith('Then ') || trimmedLine.startsWith('And ')) {
       bddLines.push(trimmedLine);
     }
   }
-  
-  return bddLines.length > 0 ? '    ' + bddLines.join('\n    ') : '';
+
+  return bddLines.length > 0 ? ' ' + bddLines.join('\n ') : '';
 }
 
 export const customPriorityMapping: { [key: string]: string } = {
@@ -86,9 +86,12 @@ export function createJiraConfig() {
 
   const type = detectJiraType(jiraBaseUrl);
   const apiEndpoints = getApiEndpoints(type);
-  
-  const baseUrl = type === 'cloud' 
-    ? 'https://api.zephyrscale.smartbear.com/v2' 
+
+  // Cloud: use ZEPHYR_API_BASE_URL if set (e.g. for EU: https://eu.api.zephyrscale.smartbear.com/v2), else default US
+  const defaultCloudBaseUrl = 'https://api.zephyrscale.smartbear.com/v2';
+  const cloudBaseUrl = process.env.ZEPHYR_API_BASE_URL?.trim();
+  const baseUrl = type === 'cloud'
+    ? (cloudBaseUrl || defaultCloudBaseUrl)
     : jiraBaseUrl;
 
   const authHeaders = {
