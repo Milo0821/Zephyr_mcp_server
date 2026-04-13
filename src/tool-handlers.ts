@@ -31,6 +31,11 @@ export class ZephyrToolHandlers {
   }
 
   async createTestCase(args: TestCaseArgs) {
+    // Some MCP clients (e.g. Claude Code) pass nested object parameters as JSON strings.
+    // Parse test_script if it arrived as a string.
+    if (typeof (args as any).test_script === 'string') {
+      try { (args as any).test_script = JSON.parse((args as any).test_script); } catch {}
+    }
     const {
       project_key,
       name,
@@ -97,11 +102,31 @@ export class ZephyrToolHandlers {
     // Always set status to Draft for new test cases
     payload.status = 'Draft';
 
+    // For Zephyr Scale Cloud, the POST /testcases endpoint silently discards BDD testScript content.
+    // BDD must be written separately via PUT /testcases/{key}/testscript after creation.
+    // Remove BDD testScript from the POST payload on Cloud to avoid confusion.
+    const isBddOnCloud = this.jiraConfig.type === 'cloud' && test_script?.type === 'BDD';
+    if (isBddOnCloud) {
+      delete payload.testScript;
+    }
+
     try {
       const response = await this.axiosInstance.post(this.jiraConfig.apiEndpoints.testcase, payload);
 
       if (response.status === 201) {
         const testKey = response.data.key || 'Unknown';
+
+        // For Cloud BDD: write the script content via the dedicated testscript endpoint.
+        // Cloud uses POST (not PUT) and requires lowercase type 'bdd'.
+        if (isBddOnCloud && test_script?.text) {
+          const gherkinContent = convertToGherkin(test_script.text);
+          const scriptText = gherkinContent && gherkinContent.trim().length > 0 ? gherkinContent : test_script.text;
+          await this.axiosInstance.post(
+            `${this.jiraConfig.apiEndpoints.testcase}/${testKey}/testscript`,
+            { type: 'bdd', text: scriptText }
+          );
+        }
+
         return {
           content: [
             {
@@ -138,84 +163,93 @@ export class ZephyrToolHandlers {
   async updateTestCaseBdd(args: UpdateBddArgs) {
     const { test_case_key, bdd_content, name } = args;
 
+    // Convert incoming BDD markdown (fallback to raw content if conversion returns empty)
+    const converted = convertToGherkin(bdd_content);
+    const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
+
     try {
-      // First, get the existing test case data
-      const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
-      const testCaseData = getResponse.data;
+      if (this.jiraConfig.type === 'cloud') {
+        // Zephyr Scale Cloud: use the dedicated testscript endpoint.
+        // Cloud uses POST (not PUT) and requires lowercase type 'bdd'.
+        const scriptResponse = await this.axiosInstance.post(
+          `${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}/testscript`,
+          { type: 'bdd', text: finalText }
+        );
 
-      // Convert incoming BDD markdown (fallback to raw content if conversion returns empty)
-      const converted = convertToGherkin(bdd_content);
-      const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
+        if (scriptResponse.status === 200 || scriptResponse.status === 201 || scriptResponse.status === 204) {
+          // Optionally update the name if provided
+          if (typeof name === 'string' && name.trim().length > 0) {
+            const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
+            const testCaseData = getResponse.data;
+            // Derive projectKey from key (e.g. "PROJ-T123" → "PROJ") as Cloud API returns project object, not flat projectKey
+            const projectKey = testCaseData.projectKey ?? test_case_key.replace(/-T\d+$/, '');
+            await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, {
+              projectKey,
+              name,
+              status: testCaseData.status,
+              priority: testCaseData.priority,
+            });
+          }
 
-      // Build a payload aligned with Zephyr Scale Server's update schema.
-      // Only include fields that exist to avoid accidental nulling; required fields must be present.
-      const payload: any = {};
-
-      // Required base fields (schema requires these on Server/Data Center). If missing, throw.
-      const requiredFields: Array<[string, any]> = [
-        ['projectKey', testCaseData.projectKey],
-        ['name', testCaseData.name],
-        ['status', testCaseData.status],
-        ['priority', testCaseData.priority]
-      ];
-
-      for (const [field, value] of requiredFields) {
-        if (value === undefined || value === null || value === '') {
-          throw new McpError(ErrorCode.InternalError, `Existing test case is missing required field '${field}' needed for update.`);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `✅ Updated ${test_case_key} with BDD content successfully\n${JSON.stringify({ textLength: finalText.length }, null, 2)}`,
+              },
+            ],
+          };
         }
-        payload[field] = value;
-      }
 
-      // Optional name update
-      if (typeof name === 'string' && name.trim().length > 0) {
-        payload.name = name;
-      }
+        throw new Error(`Unexpected status: ${scriptResponse.status}`);
+      } else {
+        // Zephyr Scale Data Center: BDD is set via PUT /testcase/{key} with full payload.
+        const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
+        const testCaseData = getResponse.data;
 
-      // Optional simple scalar/string fields
-      const optionalScalarFields = [
-        'objective',
-        'precondition',
-        'folder',
-        'component',
-        'owner',
-        'estimatedTime'
-      ];
-      for (const field of optionalScalarFields) {
-        if (testCaseData[field] !== undefined) payload[field] = testCaseData[field];
-      }
+        // Derive projectKey from the test case key if the API doesn't return it as a flat field
+        const projectKey = testCaseData.projectKey ?? test_case_key.replace(/-T\d+$/, '');
 
-      // Arrays / objects
-      if (Array.isArray(testCaseData.labels)) payload.labels = testCaseData.labels;
-      if (testCaseData.customFields) payload.customFields = testCaseData.customFields;
-      if (testCaseData.parameters) payload.parameters = testCaseData.parameters;
-      // issueLinks preferred; map deprecated issueKey if present and issueLinks absent
-      if (Array.isArray(testCaseData.issueLinks)) {
-        payload.issueLinks = testCaseData.issueLinks;
-      } else if (testCaseData.issueKey) {
-        payload.issueLinks = [testCaseData.issueKey];
-      }
-
-      // Build testScript. Force type to BDD when performing a BDD update.
-      payload.testScript = {
-        type: 'BDD',
-        text: finalText
-      };
-
-      // PUT update
-      const updateResponse = await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, payload);
-
-      if (updateResponse.status === 200) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `✅ Updated ${test_case_key} with BDD content successfully\nPayload summary: ${JSON.stringify({ textLength: finalText.length, projectKey: payload.projectKey, name: payload.name, preservedLabels: payload.labels?.length || 0 }, null, 2)}`,
-            },
-          ],
+        const payload: any = {
+          projectKey,
+          name: (typeof name === 'string' && name.trim().length > 0) ? name : testCaseData.name,
+          status: testCaseData.status,
+          priority: testCaseData.priority,
         };
-      }
 
-      throw new Error(`Failed to update ${test_case_key}: ${updateResponse.status}`);
+        const optionalScalarFields = ['objective', 'precondition', 'folder', 'component', 'owner', 'estimatedTime'];
+        for (const field of optionalScalarFields) {
+          if (testCaseData[field] !== undefined) payload[field] = testCaseData[field];
+        }
+        if (Array.isArray(testCaseData.labels)) payload.labels = testCaseData.labels;
+        if (testCaseData.customFields) payload.customFields = testCaseData.customFields;
+        if (testCaseData.parameters) payload.parameters = testCaseData.parameters;
+        if (Array.isArray(testCaseData.issueLinks)) {
+          payload.issueLinks = testCaseData.issueLinks;
+        } else if (testCaseData.issueKey) {
+          payload.issueLinks = [testCaseData.issueKey];
+        }
+
+        payload.testScript = { type: 'BDD', text: finalText };
+
+        const updateResponse = await this.axiosInstance.put(
+          `${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`,
+          payload
+        );
+
+        if (updateResponse.status === 200) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `✅ Updated ${test_case_key} with BDD content successfully\n${JSON.stringify({ textLength: finalText.length, projectKey: payload.projectKey, name: payload.name }, null, 2)}`,
+              },
+            ],
+          };
+        }
+
+        throw new Error(`Failed to update ${test_case_key}: ${updateResponse.status}`);
+      }
     } catch (error) {
       throw new McpError(
         ErrorCode.InternalError,
