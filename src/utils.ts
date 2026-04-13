@@ -1,26 +1,52 @@
 export function convertToGherkin(bddContent: string): string {
   const bddLines: string[] = [];
   const lines = bddContent.split('\n');
-  
+
+  // Bold-markdown step keywords (e.g. **Given**, **When**, etc.)
+  const boldStepKeywords = ['Given', 'When', 'Then', 'And', 'But'];
+  // Plain step keyword prefixes
+  const stepKeywords = ['Given ', 'When ', 'Then ', 'And ', 'But '];
+  // Zephyr Scale Cloud only accepts steps and table rows — Feature:/Scenario: wrappers
+  // cause a 400 "Invalid Gherkin script" error and must be stripped.
+  const strippedPrefixes = [
+    'Feature:',
+    'Background:',
+    'Scenario Outline:',
+    'Scenario:',
+    'Examples:',
+  ];
+
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (!trimmedLine || trimmedLine.startsWith('---')) continue;
-    
-    if (trimmedLine.startsWith('**Given**')) {
-      bddLines.push(`Given ${trimmedLine.replace('**Given**', '').trim()}`);
-    } else if (trimmedLine.startsWith('**When**')) {
-      bddLines.push(`When ${trimmedLine.replace('**When**', '').trim()}`);
-    } else if (trimmedLine.startsWith('**Then**')) {
-      bddLines.push(`Then ${trimmedLine.replace('**Then**', '').trim()}`);
-    } else if (trimmedLine.startsWith('**And**')) {
-      bddLines.push(`And ${trimmedLine.replace('**And**', '').trim()}`);
-    } else if (trimmedLine.startsWith('Given ') || trimmedLine.startsWith('When ') || 
-               trimmedLine.startsWith('Then ') || trimmedLine.startsWith('And ')) {
+
+    // Strip structural Gherkin keywords — not accepted by the Zephyr Scale Cloud testscript API
+    if (strippedPrefixes.some(p => trimmedLine.startsWith(p))) continue;
+
+    // Convert **Keyword** markdown bold to plain Gherkin keyword
+    let matchedBold = false;
+    for (const kw of boldStepKeywords) {
+      if (trimmedLine.startsWith(`**${kw}**`)) {
+        bddLines.push(`${kw} ${trimmedLine.replace(`**${kw}**`, '').trim()}`);
+        matchedBold = true;
+        break;
+      }
+    }
+    if (matchedBold) continue;
+
+    // Plain step keywords — pass through unchanged
+    if (stepKeywords.some(k => trimmedLine.startsWith(k))) {
+      bddLines.push(trimmedLine);
+      continue;
+    }
+
+    // Table rows — pass through unchanged
+    if (trimmedLine.startsWith('|')) {
       bddLines.push(trimmedLine);
     }
   }
-  
-  return bddLines.length > 0 ? '    ' + bddLines.join('\n    ') : '';
+
+  return bddLines.join('\n');
 }
 
 export const customPriorityMapping: { [key: string]: string } = {

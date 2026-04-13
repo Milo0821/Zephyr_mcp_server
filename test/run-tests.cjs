@@ -22,8 +22,14 @@ async function runAllTests() {
     console.log('-' .repeat(40));
     const unitTests = new ZephyrServerTest();
     const unitTestsPassed = await unitTests.runAllTests();
-    
-    if (!unitTestsPassed) {
+
+    // Run focused unit tests for BDD fixes
+    console.log('\n📋 PHASE 1b: BDD & Security Unit Tests');
+    console.log('-' .repeat(40));
+    const { runUnitTests } = await import('./unit.test.cjs');
+    const bddUnitTestsPassed = await runUnitTests();
+
+    if (!unitTestsPassed || !bddUnitTestsPassed) {
       allTestsPassed = false;
       console.log('\n❌ Unit tests failed - skipping integration tests');
     } else {
