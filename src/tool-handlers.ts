@@ -513,12 +513,16 @@ export class ZephyrToolHandlers {
 
       const cycleKey = response.data.key || 'Unknown';
 
-      // Step 2: add test cases to the cycle
+      // Step 2: add test cases via test executions (Cloud v2 has no /testcycles/{key}/testcases)
       if (test_case_keys && test_case_keys.length > 0) {
-        await this.axiosInstance.post(
-          `${this.jiraConfig.apiEndpoints.testrun}/${cycleKey}/testcases`,
-          { items: test_case_keys.map((k: string) => ({ testCaseKey: k })) }
-        );
+        for (const testCaseKey of test_case_keys) {
+          await this.axiosInstance.post('/testexecutions', {
+            projectKey: project_key,
+            testCaseKey,
+            testCycleKey: cycleKey,
+            statusName: 'Not Executed',
+          });
+        }
       }
 
       return {
@@ -813,28 +817,24 @@ export class ZephyrToolHandlers {
 
     const { test_run_key, test_case_keys } = args;
 
-    try {
-      const payload = {
-        items: test_case_keys.map(key => ({ testCaseKey: key }))
-      };
-      const response = await this.axiosInstance.post(
-        `${this.jiraConfig.apiEndpoints.testrun}/${test_run_key}/testcases`,
-        payload
-      );
+    // Derive project key from the test run key (e.g. PROJ-R123 → PROJ)
+    const project_key = test_run_key.split('-')[0];
 
-      if (response.status === 200 || response.status === 201 || response.status === 204) {
-        return {
-          content: [{ type: 'text', text: `Added ${test_case_keys.length} test case(s) to test run ${test_run_key}.` }],
-        };
+    try {
+      for (const testCaseKey of test_case_keys) {
+        await this.axiosInstance.post('/testexecutions', {
+          projectKey: project_key,
+          testCaseKey,
+          testCycleKey: test_run_key,
+          statusName: 'Not Executed',
+        });
       }
+      return {
+        content: [{ type: 'text', text: `Added ${test_case_keys.length} test case(s) to test run ${test_run_key}.` }],
+      };
     } catch (error) {
       throw new McpError(ErrorCode.InternalError, `Failed to add test cases: ${this.formatError(error)}`);
     }
-
-    return {
-      content: [{ type: 'text', text: 'An unexpected error occurred.' }],
-      isError: true,
-    };
   }
 
   private formatError(error: unknown): string {
