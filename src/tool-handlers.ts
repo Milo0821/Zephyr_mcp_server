@@ -190,46 +190,27 @@ export class ZephyrToolHandlers {
   private async updateTestCaseBddCloud(args: UpdateBddArgs) {
     const { test_case_key, bdd_content, name } = args;
 
+    const converted = convertToGherkin(bdd_content);
+    const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
+
     try {
-      // Step 1: GET existing test case to extract required fields for PUT
-      const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
-      const tc = getResponse.data;
-
-      // Cloud v2 PUT requires: id, key, name, project, priority, status
-      const requiredFields = ['id', 'key', 'name', 'project', 'priority', 'status'];
-      for (const field of requiredFields) {
-        if (tc[field] === undefined || tc[field] === null) {
-          throw new McpError(ErrorCode.InternalError,
-            `Existing test case is missing required field '${field}' needed for Cloud v2 update.`);
-        }
-      }
-
-      const putPayload: any = {
-        id: tc.id,
-        key: tc.key,
-        name: typeof name === 'string' && name.trim().length > 0 ? name : tc.name,
-        project: tc.project,
-        priority: tc.priority,
-        status: tc.status,
-      };
-
-      // Preserve optional fields
-      for (const field of ['objective', 'precondition', 'estimatedTime', 'folder', 'component', 'owner']) {
-        if (tc[field] !== undefined) putPayload[field] = tc[field];
-      }
-      if (Array.isArray(tc.labels)) putPayload.labels = tc.labels;
-      if (tc.customFields) putPayload.customFields = tc.customFields;
-
-      // Step 2: PUT to update metadata
-      await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, putPayload);
-
-      // Step 3: POST testscript with BDD content
-      const converted = convertToGherkin(bdd_content);
-      const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
       await this.axiosInstance.post(
         `${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}/testscript`,
         { type: 'bdd', text: finalText }
       );
+
+      // Only fetch and PUT metadata when the caller also wants to rename the test case
+      if (typeof name === 'string' && name.trim().length > 0) {
+        const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
+        const tc = getResponse.data;
+        const projectKey = tc.projectKey ?? test_case_key.replace(/-T\d+$/, '');
+        await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, {
+          projectKey,
+          name,
+          status: tc.status,
+          priority: tc.priority,
+        });
+      }
 
       return {
         content: [{
