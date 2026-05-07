@@ -32,6 +32,11 @@ export class ZephyrToolHandlers {
   }
 
   async createTestCase(args: TestCaseArgs) {
+    // Some MCP clients (e.g. Claude Code) pass nested object parameters as JSON strings.
+    // Parse test_script if it arrived as a string.
+    if (typeof (args as any).test_script === 'string') {
+      try { (args as any).test_script = JSON.parse((args as any).test_script); } catch {}
+    }
     if (this.jiraConfig.type === 'cloud') {
       return this.createTestCaseCloud(args);
     }
@@ -249,8 +254,9 @@ export class ZephyrToolHandlers {
       const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
 
       const payload: any = {};
+      const projectKey = testCaseData.projectKey ?? test_case_key.replace(/-T\d+$/, '');
       const requiredFields: Array<[string, any]> = [
-        ['projectKey', testCaseData.projectKey],
+        ['projectKey', projectKey],
         ['name', testCaseData.name],
         ['status', testCaseData.status],
         ['priority', testCaseData.priority]
