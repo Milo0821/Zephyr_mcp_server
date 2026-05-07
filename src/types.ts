@@ -79,6 +79,12 @@ export interface AddTestCasesToRunArgs {
   test_case_keys: string[];
 }
 
+export interface GetTestExecutionArgs {
+  execution_id: string;
+  /** Required for Data Center. Optional for Cloud (direct fetch by ID/key). */
+  test_run_keys?: string[];
+}
+
 export interface SearchTestRunsArgs {
   project_key?: string;
   folder?: string;

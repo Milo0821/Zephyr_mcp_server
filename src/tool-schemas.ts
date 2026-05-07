@@ -176,7 +176,7 @@ export const toolSchemas = [
   },
   {
     name: 'create_folder',
-    description: 'Create a new folder in Zephyr Scale',
+    description: 'Create a new folder in Zephyr Scale. On Cloud: provide a path like "/Parent/Child" — the server resolves parent segments and creates the leaf folder. On Data Center: the full path is sent directly.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -186,7 +186,7 @@ export const toolSchemas = [
         },
         name: {
           type: 'string',
-          description: 'Full folder path including parent folders (required). Examples: "/MyFolder" for root folder, "/Parent/Child" for nested folder',
+          description: 'Full folder path including parent folders (required). Examples: "/MyFolder" for root folder, "/Parent/Child" for nested folder. On Cloud, individual segment names must not contain "/" or "\\".',
         },
         folder_type: {
           type: 'string',
@@ -214,7 +214,7 @@ export const toolSchemas = [
   },
   {
     name: 'delete_test_case',
-    description: 'Delete a specific test case',
+    description: 'Delete a specific test case (Data Center only — not supported on Cloud v2)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -306,22 +306,22 @@ export const toolSchemas = [
   },
   {
     name: 'get_test_execution',
-    description: 'Get detailed information about a specific test execution by run ID',
+    description: 'Get detailed information about a specific test execution by ID or key. On Cloud, provide the execution ID or key (e.g., PROJ-E123) directly. On Data Center, also provide test_run_keys to search within.',
     inputSchema: {
       type: 'object',
       properties: {
         execution_id: {
           type: 'string',
-          description: 'Test execution ID (e.g., 5805255)',
+          description: 'Test execution ID or key (e.g., 5805255 or PROJ-E123)',
         },
         test_run_keys: {
           type: 'array',
-          description: 'Array of test run keys to search in (required, e.g., ["PROJ-C152", "PROJ-C161"])',
+          description: 'Array of test run keys to search in (required for Data Center, optional for Cloud — e.g., ["PROJ-C152", "PROJ-C161"])',
           items: { type: 'string' },
           minItems: 1
         },
       },
-      required: ['execution_id', 'test_run_keys'],
+      required: ['execution_id'],
     },
   },
   {
@@ -375,7 +375,7 @@ export const toolSchemas = [
   },
   {
     name: 'delete_test_run',
-    description: 'Delete a specific test run',
+    description: 'Delete a specific test run (Data Center only — not supported on Cloud v2)',
     inputSchema: {
       type: 'object',
       properties: {

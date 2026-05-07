@@ -1,3 +1,45 @@
+import { AxiosInstance } from 'axios';
+
+export async function resolveFolderIdByPath(
+  axiosInstance: AxiosInstance,
+  projectKey: string,
+  folderPath: string,
+  folderType: string
+): Promise<number | null> {
+  // Normalise: strip leading/trailing slashes, split into segments
+  const segments = folderPath.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  if (segments.length === 0) return null;
+
+  try {
+    // Fetch all folders for the project + type (up to 1000)
+    const response = await axiosInstance.get('/folders', {
+      params: { projectKey, folderType, maxResults: 1000 },
+    });
+
+    const folders: Array<{ id: number; parentId: number | null; name: string }> =
+      Array.isArray(response.data)
+        ? response.data
+        : response.data?.values ?? [];
+
+    // Walk segments top-down, matching by name under the correct parent
+    let parentId: number | null = null;
+    let matchedId: number | null = null;
+
+    for (const segment of segments) {
+      const match = folders.find(
+        (f) => f.name === segment && (f.parentId ?? null) === parentId
+      );
+      if (!match) return null;
+      matchedId = match.id;
+      parentId = match.id;
+    }
+
+    return matchedId;
+  } catch {
+    return null;
+  }
+}
+
 export function convertToGherkin(bddContent: string): string {
   const bddLines: string[] = [];
   const lines = bddContent.split('\n');
@@ -56,7 +98,7 @@ export function getApiEndpoints(jiraType: 'cloud' | 'datacenter') {
   if (jiraType === 'cloud') {
     return {
       testcase: '/testcases',
-      testrun: '/testruns',
+      testrun: '/testcycles',
       folder: '/folders',
       search: '/testcases/search',
     };

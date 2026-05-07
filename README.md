@@ -27,8 +27,7 @@ Configure your MCP client with the following structure.
       "args": ["zephyr-scale-mcp-server@latest"],
       "env": {
         "ZEPHYR_BASE_URL": "https://your-company.atlassian.net",
-        "JIRA_USERNAME": "your-email@example.com",
-        "JIRA_API_TOKEN": "your-api-token"
+        "ZEPHYR_API_KEY": "your-zephyr-api-key"
       }
     }
   }
@@ -139,19 +138,16 @@ The server provides access to various resources through URI schemes:
 
 ## Authentication
 
-The MCP server supports both Jira Cloud and Jira Data Center instances.
-
 ### Jira Cloud Configuration
 - `ZEPHYR_BASE_URL`: `https://your-company.atlassian.net`
-- `JIRA_USERNAME`: `your-email@example.com`
-- `JIRA_API_TOKEN`: Your API token from Atlassian account settings.
+- `ZEPHYR_API_KEY`: Your Zephyr Scale API key (JWT). Generate it in Jira by clicking your profile picture (bottom left) → **Zephyr API keys**.
 
 ### Jira Data Center Configuration
 - `ZEPHYR_BASE_URL`: `https://your-jira-server.com`
-- `ZEPHYR_API_KEY`: Your API token from your Jira profile settings.
+- `ZEPHYR_API_KEY`: Your Zephyr Scale API token from your Jira profile settings.
 
 ### Automatic Detection
-The server automatically detects your Jira type based on the `ZEPHYR_BASE_URL`. You can also explicitly set it with `JIRA_TYPE="cloud"` or `"datacenter"`.
+The server automatically detects your Jira type based on `ZEPHYR_BASE_URL` — URLs containing `.atlassian.net` are treated as Cloud, everything else as Data Center. Override with `JIRA_TYPE="cloud"` or `JIRA_TYPE="datacenter"`.
 
 ## License
 
