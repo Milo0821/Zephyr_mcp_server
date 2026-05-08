@@ -64,7 +64,8 @@ export interface TestRunArgs {
   planned_end_date?: string;
   description?: string;
   owner?: string;
-  environment?: string;
+  environment?: string;        // Cloud: mapped to environmentName on each TestExecutionInput; DC: cycle-level field
+  jira_project_version?: number; // Cloud only: Jira project version/release ID (integer)
   issue_key?: string;
   issue_links?: string[];
   custom_fields?: Record<string, any>;

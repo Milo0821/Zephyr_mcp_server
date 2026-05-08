@@ -124,13 +124,19 @@ export class ZephyrToolHandlers {
     if (!test_script) return;
 
     if (test_script.type === 'STEP_BY_STEP' && test_script.steps && test_script.steps.length > 0) {
-      const items = test_script.steps.map((step: any) => ({
-        inline: {
-          description: step.description || '',
-          testData: step.testData || null,
-          expectedResult: step.expectedResult || null,
-        },
-      }));
+      const items = test_script.steps.map((step: any) => {
+        // If step is a call-to-test (testCaseKey), use the testCase variant
+        if (step.testCaseKey) {
+          return { testCase: { testCaseKey: step.testCaseKey } };
+        }
+        return {
+          inline: {
+            description: step.description || '',
+            testData: step.testData || null,
+            expectedResult: step.expectedResult || null,
+          },
+        };
+      });
       await this.axiosInstance.post(
         `${this.jiraConfig.apiEndpoints.testcase}/${testKey}/teststeps`,
         { mode: 'OVERWRITE', items }
@@ -234,15 +240,22 @@ export class ZephyrToolHandlers {
         const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
         const tc = getResponse.data;
         // UpdateTestCaseInput requires: id, key, name, priority, project, status
-        // tc.project is a ProjectLink { id, self } — pass it back as-is
-        await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, {
+        // All optional fields must also be re-sent or the API will clear them
+        const putPayload: any = {
           id: tc.id,
           key: test_case_key,
           name,
           status: tc.status,
           priority: tc.priority,
           project: tc.project,
-        });
+        };
+        // Preserve all optional fields to avoid the API clearing them
+        for (const field of ['objective', 'precondition', 'estimatedTime', 'component', 'owner', 'folder']) {
+          if (tc[field] !== undefined && tc[field] !== null) putPayload[field] = tc[field];
+        }
+        if (Array.isArray(tc.labels) && tc.labels.length > 0) putPayload.labels = tc.labels;
+        if (tc.customFields && Object.keys(tc.customFields).length > 0) putPayload.customFields = tc.customFields;
+        await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, putPayload);
       }
 
       return {
@@ -504,11 +517,13 @@ export class ZephyrToolHandlers {
     const {
       project_key, name, test_case_keys, folder,
       planned_start_date, planned_end_date, description,
-      owner, environment, custom_fields,
+      owner, environment, custom_fields, issue_links, issue_key,
+      jira_project_version,
     } = args;
 
     // Cloud v2 TestCycleInput: projectKey, name, description, plannedStartDate,
-    // plannedEndDate, statusName, folderId, ownerId, customFields
+    // plannedEndDate, statusName, folderId, ownerId, jiraProjectVersion, customFields
+    // Note: environment is NOT a TestCycleInput field on Cloud — it belongs on TestExecutionInput
     const payload: any = { projectKey: project_key, name };
 
     if (description) payload.description = description;
@@ -517,6 +532,8 @@ export class ZephyrToolHandlers {
     if (custom_fields) payload.customFields = custom_fields;
     // Cloud v2 TestCycleInput supports ownerId (Jira Account ID)
     if (owner) payload.ownerId = owner;
+    // Link to a Jira project version/release (integer ID)
+    if (jira_project_version) payload.jiraProjectVersion = jira_project_version;
     if (folder) {
       const folderId = await resolveFolderIdByPath(
         this.axiosInstance, project_key, folder, 'TEST_CYCLE'
@@ -535,14 +552,46 @@ export class ZephyrToolHandlers {
       // Step 2: add test cases via test executions (Cloud v2 has no /testcycles/{key}/testcases)
       if (test_case_keys && test_case_keys.length > 0) {
         for (const testCaseKey of test_case_keys) {
-          await this.axiosInstance.post('/testexecutions', {
+          const execPayload: any = {
             projectKey: project_key,
             testCaseKey,
             testCycleKey: cycleKey,
             statusName: 'Not Executed',
-          });
+          };
+          // environment is set at execution level on Cloud, not cycle level
+          if (environment) execPayload.environmentName = environment;
+          await this.axiosInstance.post('/testexecutions', execPayload);
         }
       }
+
+      // Step 3: link Jira issues via POST /testcycles/{key}/links/issues
+      // Merge issue_key (single) and issue_links (array) into one list
+      const allIssueLinks = [
+        ...(issue_key ? [issue_key] : []),
+        ...(issue_links ?? []),
+      ];
+      const linkWarnings: string[] = [];
+      if (allIssueLinks.length > 0) {
+        for (const ik of allIssueLinks) {
+          try {
+            const issueId = await this.resolveJiraIssueId(ik);
+            await this.axiosInstance.post(
+              `${this.jiraConfig.apiEndpoints.testrun}/${cycleKey}/links/issues`,
+              { issueId }
+            );
+          } catch (e) {
+            linkWarnings.push(`${ik}: ${this.formatError(e)}`);
+          }
+        }
+      }
+
+      const missingCreds = !process.env.JIRA_USERNAME || !process.env.JIRA_API_TOKEN;
+      const credHint = missingCreds && linkWarnings.length > 0
+        ? '\n💡 Tip: Set JIRA_USERNAME and JIRA_API_TOKEN env vars to enable issue linking on Cloud.'
+        : '';
+      const warningText = linkWarnings.length > 0
+        ? `\n⚠️ Some issue links failed:\n${linkWarnings.map(w => `  - ${w}`).join('\n')}${credHint}`
+        : '';
 
       return {
         content: [{
@@ -551,7 +600,8 @@ export class ZephyrToolHandlers {
             key: cycleKey,
             name,
             testCaseCount: test_case_keys?.length || 0,
-          }, null, 2)}`,
+            linkedIssues: allIssueLinks.length - linkWarnings.length,
+          }, null, 2)}${warningText}`,
         }],
       };
     } catch (error) {

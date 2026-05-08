@@ -74,14 +74,12 @@ export const toolSchemas = [
         },
         status: {
           type: 'string',
-          description: 'Test case status (optional)',
-          enum: ['Draft', 'Approved', 'Deprecated'],
+          description: 'Test case status (optional, default: "Draft"). Value must match a status name configured in your Zephyr project (e.g. "Draft", "Approved", "Deprecated"). Note: always overridden to "Draft" on creation.',
           default: 'Draft',
         },
         priority: {
           type: 'string',
-          description: 'Test case priority (optional)',
-          enum: ['High', 'Normal', 'Low'],
+          description: 'Test case priority (optional). Value must match a priority name configured in your Zephyr project (e.g. "High", "Normal", "Low", "Critical"). Use zephyr://testcase/EXISTING-KEY to check your project\'s valid values.',
         },
         precondition: {
           type: 'string',
@@ -206,7 +204,7 @@ export const toolSchemas = [
       properties: {
         test_run_key: {
           type: 'string',
-          description: 'Test run key (e.g., PROJ-C123)',
+          description: 'Test run key (e.g., PROJ-R123)',
         },
       },
       required: ['test_run_key'],
@@ -271,16 +269,20 @@ export const toolSchemas = [
         },
         environment: {
           type: 'string',
-          description: 'Test environment (optional)',
+          description: 'Test environment name (optional). On Cloud, applied to each test execution (environmentName). On Data Center, set at cycle level.',
         },
         issue_key: {
           type: 'string',
-          description: 'Single issue key to link to the test run (optional) - will be mapped to issueKey in API',
+          description: 'Single Jira issue key to link to the test cycle (e.g. "PROJ-123"). On Cloud, resolved to a numeric ID via Jira REST API — requires JIRA_USERNAME + JIRA_API_TOKEN env vars.',
         },
         issue_links: {
           type: 'array',
-          description: 'Array of issue links (optional) - will be mapped to issueLinks in API',
+          description: 'Array of Jira issue keys to link to the test cycle (e.g. ["PROJ-123", "PROJ-456"]). On Cloud, each key is resolved to a numeric ID via Jira REST API — requires JIRA_USERNAME + JIRA_API_TOKEN env vars. Failures are reported as warnings and do not fail the tool call.',
           items: { type: 'string' },
+        },
+        jira_project_version: {
+          type: 'integer',
+          description: 'Jira project version/release ID to link this test cycle to (optional, Cloud only — use the numeric version ID).',
         },
         custom_fields: {
           type: 'object',
@@ -316,7 +318,7 @@ export const toolSchemas = [
         },
         test_run_keys: {
           type: 'array',
-          description: 'Array of test run keys to search in (required for Data Center, optional for Cloud — e.g., ["PROJ-C152", "PROJ-C161"])',
+          description: 'Array of test run keys to search in (required for Data Center, optional for Cloud — e.g., ["PROJ-R152", "PROJ-R161"])',
           items: { type: 'string' },
           minItems: 1
         },
@@ -395,7 +397,7 @@ export const toolSchemas = [
       properties: {
         test_run_key: {
           type: 'string',
-          description: 'Test run key (e.g., PROJ-C161)',
+          description: 'Test run key (e.g., PROJ-R161)',
         },
         test_case_keys: {
           type: 'array',
