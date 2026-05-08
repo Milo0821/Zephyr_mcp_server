@@ -104,6 +104,7 @@ export interface ApiEndpoints {
 export interface JiraConfig {
   type: JiraType;
   baseUrl: string;
+  jiraBaseUrl: string;
   authHeaders: Record<string, string>;
   apiEndpoints: ApiEndpoints;
 }

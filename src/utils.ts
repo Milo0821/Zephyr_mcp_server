@@ -170,6 +170,7 @@ export function createJiraConfig() {
   return {
     type,
     baseUrl,
+    jiraBaseUrl,
     authHeaders,
     apiEndpoints,
   };

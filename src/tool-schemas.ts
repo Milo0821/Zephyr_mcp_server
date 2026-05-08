@@ -110,7 +110,7 @@ export const toolSchemas = [
         },
         issue_links: {
           type: 'array',
-          description: 'Array of issue links (optional) - will be mapped to issueLinks in API',
+          description: 'Array of Jira issue keys to link to this test case (e.g. ["PROJ-123", "PROJ-456"]). On Cloud, each key is resolved to a numeric Jira issue ID via the Jira REST API, then linked via POST /testcases/{key}/links/issues — failures are reported as warnings but do not fail the tool call. On Data Center, sent directly in the create payload.',
           items: { type: 'string' }
         },
         custom_fields: {

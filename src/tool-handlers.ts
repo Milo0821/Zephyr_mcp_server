@@ -46,7 +46,7 @@ export class ZephyrToolHandlers {
   private async createTestCaseCloud(args: TestCaseArgs) {
     const {
       project_key, name, test_script, folder, priority, precondition,
-      objective, estimated_time, labels, custom_fields,
+      objective, estimated_time, labels, custom_fields, issue_links,
     } = args;
 
     const payload: any = { projectKey: project_key, name };
@@ -79,10 +79,31 @@ export class ZephyrToolHandlers {
         await this.upsertTestScriptCloud(testKey, test_script);
       }
 
+      // Step 3: link Jira issues via POST /testcases/{key}/links/issues
+      // IssueLinkInput requires a numeric issueId — resolve each key via Jira REST API
+      const linkWarnings: string[] = [];
+      if (issue_links && issue_links.length > 0) {
+        for (const issueKey of issue_links) {
+          try {
+            const issueId = await this.resolveJiraIssueId(issueKey);
+            await this.axiosInstance.post(
+              `${this.jiraConfig.apiEndpoints.testcase}/${testKey}/links/issues`,
+              { issueId }
+            );
+          } catch (e) {
+            linkWarnings.push(`${issueKey}: ${this.formatError(e)}`);
+          }
+        }
+      }
+
+      const warningText = linkWarnings.length > 0
+        ? `\n⚠️ Some issue links failed:\n${linkWarnings.map(w => `  - ${w}`).join('\n')}`
+        : '';
+
       return {
         content: [{
           type: 'text',
-          text: `✅ Test case created successfully: ${testKey}\n${JSON.stringify({ key: testKey, type: test_script?.type || 'none' }, null, 2)}`,
+          text: `✅ Test case created successfully: ${testKey}\n${JSON.stringify({ key: testKey, type: test_script?.type || 'none', linkedIssues: (issue_links ?? []).length - linkWarnings.length }, null, 2)}${warningText}`,
         }],
       };
     } catch (error) {
@@ -822,6 +843,19 @@ export class ZephyrToolHandlers {
     } catch (error) {
       throw new McpError(ErrorCode.InternalError, `Failed to add test cases: ${this.formatError(error)}`);
     }
+  }
+
+  private async resolveJiraIssueId(issueKey: string): Promise<number> {
+    // The Zephyr API key is a Jira-issued token — it works against the Jira REST API too.
+    // We call GET {jiraBaseUrl}/rest/api/3/issue/{key}?fields=id to get the numeric issue ID
+    // required by POST /testcases/{key}/links/issues { issueId: <integer> }.
+    const url = `${this.jiraConfig.jiraBaseUrl}/rest/api/3/issue/${issueKey}?fields=id`;
+    const response = await this.axiosInstance.get(url, { baseURL: '' });
+    const id = parseInt(response.data.id, 10);
+    if (!id || isNaN(id)) {
+      throw new Error(`Could not resolve numeric ID for Jira issue "${issueKey}"`);
+    }
+    return id;
   }
 
   private formatError(error: unknown): string {
