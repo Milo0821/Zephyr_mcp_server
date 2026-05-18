@@ -229,18 +229,68 @@ export class ZephyrToolHandlers {
     const converted = convertToGherkin(bdd_content);
     const finalText = converted && converted.trim().length > 0 ? converted : bdd_content;
 
+    // Fetch the test case first to get the numeric ID.
+    // After a DC→Cloud migration, the project key prefix in the test case key (e.g. "CNIDS")
+    // may no longer match an active Cloud project, causing key-based write endpoints to return 404.
+    // Falling back to the numeric ID bypasses that project-key validation.
+    let tc: any = null;
     try {
-      await this.axiosInstance.post(
-        `${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}/testscript`,
-        { type: 'bdd', text: finalText }
-      );
+      const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
+      tc = getResponse.data;
+    } catch {
+      // GET failed — proceed with key only; write will surface the real error
+    }
 
-      // Only fetch and PUT metadata when the caller also wants to rename the test case
+    try {
+      // Primary path: POST to dedicated testscript endpoint using the key
+      let scriptUpdateError: any = null;
+      try {
+        await this.axiosInstance.post(
+          `${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}/testscript`,
+          { type: 'bdd', text: finalText }
+        );
+      } catch (err: any) {
+        scriptUpdateError = err;
+      }
+
+      // Fallback: if testscript POST failed (e.g. migrated project key), try PUT on the full
+      // test case record with the testScript field embedded — some Cloud instances accept this
+      // for migrated test cases where the project is deactivated.
+      if (scriptUpdateError) {
+        if (!tc) {
+          throw scriptUpdateError; // no test case data to build PUT payload, surface original error
+        }
+        const putPayload: any = {
+          id: tc.id,
+          key: test_case_key,
+          name: (typeof name === 'string' && name.trim().length > 0) ? name : tc.name,
+          status: tc.status,
+          priority: tc.priority,
+          project: tc.project,
+          testScript: { type: 'bdd', text: finalText },
+        };
+        for (const field of ['objective', 'precondition', 'estimatedTime', 'component', 'owner', 'folder']) {
+          if (tc[field] !== undefined && tc[field] !== null) putPayload[field] = tc[field];
+        }
+        if (Array.isArray(tc.labels) && tc.labels.length > 0) putPayload.labels = tc.labels;
+        if (tc.customFields && Object.keys(tc.customFields).length > 0) putPayload.customFields = tc.customFields;
+
+        await this.axiosInstance.put(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`, putPayload);
+
+        return {
+          content: [{
+            type: 'text',
+            text: `✅ Updated ${test_case_key} with BDD content successfully (Cloud v2, via PUT fallback for migrated project)`,
+          }],
+        };
+      }
+
+      // Primary path succeeded — optionally rename
       if (typeof name === 'string' && name.trim().length > 0) {
-        const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
-        const tc = getResponse.data;
-        // UpdateTestCaseInput requires: id, key, name, priority, project, status
-        // All optional fields must also be re-sent or the API will clear them
+        if (!tc) {
+          const getResponse = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
+          tc = getResponse.data;
+        }
         const putPayload: any = {
           id: tc.id,
           key: test_case_key,
@@ -249,7 +299,6 @@ export class ZephyrToolHandlers {
           priority: tc.priority,
           project: tc.project,
         };
-        // Preserve all optional fields to avoid the API clearing them
         for (const field of ['objective', 'precondition', 'estimatedTime', 'component', 'owner', 'folder']) {
           if (tc[field] !== undefined && tc[field] !== null) putPayload[field] = tc[field];
         }
