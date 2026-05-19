@@ -308,13 +308,14 @@ export class ZephyrToolHandlers {
         // Note: the Zephyr Scale Cloud API's UpdateTestCaseInput does not include a testScript field,
         // so the testScript embedded in the PUT payload is silently ignored.
         // The only endpoint that updates script content (POST /testscript) requires the project to be active.
-        // For migrated test cases with deactivated project keys (e.g. CNIDS-T*), script updates are
-        // blocked at the API level. Contact your Zephyr Scale admin to re-enable the source project.
+        // For test cases migrated from Data Center to Cloud, the original project key may be deactivated,
+        // blocking script updates at the API level. Contact your Zephyr Scale admin to re-enable the project.
         throw new McpError(
           ErrorCode.InternalError,
           `Cannot update test script for ${test_case_key}: the project "${test_case_key.replace(/-T\d+$/, '')}" is deactivated in Zephyr Scale Cloud. ` +
+          `This test case was likely migrated from Data Center and retains its original project key prefix. ` +
           `POST /testcases/{key}/testscript requires an active project. ` +
-          `Please ask your Zephyr Scale admin to re-enable the project, or recreate this test case under an active project.`
+          `Please ask your Zephyr Scale admin to re-enable the project, or recreate this test case under an active Cloud project.`
         );
       }
 
