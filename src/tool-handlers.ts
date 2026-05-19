@@ -24,8 +24,21 @@ export class ZephyrToolHandlers {
     const { test_case_key } = args;
     try {
       const response = await this.axiosInstance.get(`${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}`);
+      const testCase = response.data;
+
+      // Fetch the test script content and embed it inline.
+      // The base GET /testcases/{key} only returns a link to the script, not the content.
+      try {
+        const scriptResponse = await this.axiosInstance.get(
+          `${this.jiraConfig.apiEndpoints.testcase}/${test_case_key}/testscript`
+        );
+        testCase.testScript = scriptResponse.data;
+      } catch {
+        // Script fetch failed (e.g. no script yet) — leave testScript as the link object
+      }
+
       return {
-        content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(testCase, null, 2) }],
       };
     } catch (error) {
       throw new McpError(ErrorCode.InternalError, `Failed to get test case: ${this.formatError(error)}`);
