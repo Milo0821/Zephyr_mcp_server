@@ -8,6 +8,7 @@ Model Context Protocol server for Zephyr Scale test management, supporting both 
 - ✅ **Official API-Compliant Schemas**: Tools and data structures match the official Zephyr Scale REST API, ensuring compatibility and reliability.
 - ✅ **Unified Test Case Creation**: A single `create_test_case` tool handles all script types (BDD, Step-by-Step, Plain Text) for a simplified workflow.
 - ✅ **Full Test Lifecycle Management**: Comprehensive tools to create, read, delete test cases, and manage test runs, executions, and folders.
+- ✅ **Execution Reporting & Jira Integration** *(Cloud)*: Report execution results (Pass/Fail/Blocked), attach bugs as Jira issue links, and discover the Zephyr test cycle linked to any Jira story or epic — bridging a Jira ticket straight to its executions.
 - ✅ **Live Templating System**: Use real test cases from your Zephyr instance as templates (`zephyr://testcase/KEY`) to ensure consistency and correct project-specific fields.
 - ✅ **Unified Resource System**: Access live Zephyr data, local files (`file://`), and built-in examples through a consistent URI-based system.
 
