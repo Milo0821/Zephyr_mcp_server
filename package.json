@@ -53,10 +53,10 @@
   },
   "homepage": "https://github.com/Milo0821/Zephyr_mcp_server#readme",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "0.6.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "axios": "^1.15.0"
   },
   "devDependencies": {

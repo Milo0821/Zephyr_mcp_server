@@ -10,10 +10,19 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { toolSchemas } from './tool-schemas.js';
 import { ZephyrToolHandlers } from './tool-handlers.js';
 import { resourceList, readResource, setAxiosInstance } from './resources.js';
 import { createJiraConfig } from './utils.js';
+
+// Read version from package.json (../ relative to build/index.js at runtime) so
+// it always matches the published package rather than drifting on each release.
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
+);
 
 class ZephyrServer {
   private server: Server;
@@ -25,7 +34,7 @@ class ZephyrServer {
     this.server = new Server(
       {
         name: 'zephyr-server',
-        version: '0.3.1',
+        version: pkg.version,
       },
       {
         capabilities: {

@@ -577,3 +577,40 @@ export const toolSchemas = [
     },
   },
 ];
+
+// MCP tool annotations (behavioral hints, protocol revision 2025-03-26+).
+// Advisory only — clients use them for UX and safety, e.g. auto-approving
+// read-only calls or confirming before a destructive delete. Every tool talks
+// to the remote Zephyr/Jira API, so openWorldHint is true across the board.
+const READ_ONLY = { readOnlyHint: true, openWorldHint: true };
+const WRITE = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };
+const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, openWorldHint: true };
+
+const TOOL_ANNOTATIONS: Record<string, Record<string, boolean>> = {
+  // Reads
+  get_test_case: READ_ONLY,
+  get_folders: READ_ONLY,
+  get_test_run_cases: READ_ONLY,
+  get_test_run: READ_ONLY,
+  get_test_execution: READ_ONLY,
+  search_test_cases_by_folder: READ_ONLY,
+  search_test_runs: READ_ONLY,
+  list_executions_by_cycle: READ_ONLY,
+  get_test_cycles_for_issue: READ_ONLY,
+  // Non-destructive writes (create / update / append)
+  create_test_case: WRITE,
+  update_test_case_bdd: WRITE,
+  create_folder: WRITE,
+  create_test_run: WRITE,
+  update_test_run: WRITE,
+  add_test_cases_to_run: WRITE,
+  update_test_execution: WRITE,
+  // Destructive
+  delete_test_case: DESTRUCTIVE,
+  delete_test_run: DESTRUCTIVE,
+};
+
+for (const tool of toolSchemas) {
+  const annotations = TOOL_ANNOTATIONS[tool.name];
+  if (annotations) (tool as { annotations?: unknown }).annotations = annotations;
+}
