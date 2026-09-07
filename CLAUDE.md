@@ -108,6 +108,8 @@ All tools are defined in `tool-schemas.ts` and implemented in `tool-handlers.ts`
 - `search_test_cases_by_folder` — builds `projectKey = "X" AND folder = "Y"` query
 - `search_test_runs` — supports `project_key` and/or `folder` filters; uses platform-specific search endpoint
 - `get_test_execution` — iterates provided `test_run_keys`, searches `/testresults` for matching `execution_id`
+- `update_test_execution` — **Cloud only**; updates a test case execution's status/comment/etc. via `PUT /testexecutions/{key}`, and attaches bugs via `POST /testexecutions/{key}/links/issues`. Resolves the execution from `execution_id`, or from `test_cycle_key` + `test_case_key` (uses `onlyLastExecutions`). Bug keys are resolved to numeric issue IDs via `resolveJiraIssueId` (needs `JIRA_USERNAME` + `JIRA_API_TOKEN`); link failures become warnings.
+- `get_test_cycles_for_issue` — **Cloud only**; `GET /issuelinks/{issueKey}/testcycles` returns cycle IDs linked to a Jira issue. By default (`resolve_keys: true`) each numeric ID is resolved to its key + name via `GET /testcycles/{id}`; per-cycle resolution failures are surfaced inline (`error` field) rather than failing the call. This is the bridge from a Jira ticket → its Zephyr cycle (the link lives on the Zephyr side, not in Jira issue fields).
 
 ### Organization
 - `create_folder` — POST with `projectKey`, `name` (full path), `type`

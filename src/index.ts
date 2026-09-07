@@ -95,6 +95,10 @@ class ZephyrServer {
             return await this.toolHandlers.addTestCasesToRun(args as any);
           case 'list_executions_by_cycle':
             return await this.toolHandlers.listExecutionsByCycle(args as any);
+          case 'update_test_execution':
+            return await this.toolHandlers.updateTestExecution(args as any);
+          case 'get_test_cycles_for_issue':
+            return await this.toolHandlers.getTestCyclesForIssue(args as any);
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
         }

@@ -115,8 +115,10 @@ The server provides access to various resources through URI schemes:
 ### Test Execution & Search
 - `get_test_execution`: Get detailed individual test execution results.
 - `list_executions_by_cycle`: List all test executions for a specific test cycle with status, executor, and date. *(Cloud only)*
+- `update_test_execution`: Update a test case execution's status within a cycle (Pass/Fail/etc.), add a comment, and attach bug(s) as Jira issue links. Identify the execution by `execution_id`, or by `test_cycle_key` + `test_case_key`. *(Cloud only)*
 - `search_test_cases_by_folder`: Search for test cases in a specific folder. Automatically paginates through all results.
 - `search_test_runs`: Search for test runs by project key and/or folder path.
+- `get_test_cycles_for_issue`: Get the Zephyr test cycles linked to a Jira issue (story/epic). Resolves each cycle ID to its key (e.g. `PROJ-R123`) and name so you can feed it straight into `list_executions_by_cycle` / `update_test_execution`. *(Cloud only)*
 
 ### Organization
 - `create_folder`: Create a new folder in Zephyr Scale.
@@ -161,6 +163,33 @@ The server provides access to various resources through URI schemes:
 }
 ```
 **Note**: The server will convert markdown-style BDD into Gherkin when possible and will preserve all other existing test case fields.
+
+### Mark an Execution as Failed and Attach a Bug
+```json
+{
+  "test_cycle_key": "PROJ-R123",
+  "test_case_key": "PROJ-T456",
+  "status": "Fail",
+  "comment": "Login button unresponsive on submit.",
+  "bug_keys": ["PROJ-789"]
+}
+```
+Or target an execution directly by key:
+```json
+{
+  "execution_id": "PROJ-E123",
+  "status": "Pass"
+}
+```
+**Note**: `update_test_execution` is Cloud only. `bug_keys` requires `JIRA_USERNAME` and `JIRA_API_TOKEN`; link failures are reported as warnings while the status update still succeeds.
+
+### Find the Test Cycle Linked to a Jira Ticket
+```json
+{
+  "issue_key": "PROJ-6752"
+}
+```
+Returns the linked cycles with resolved keys, e.g. `[{ "id": "110702963", "key": "PROJ-R467", "name": "..." }]`. This is the bridge from a Jira ticket to its Zephyr cycle — the association is stored on the Zephyr side, not in Jira's issue fields. Chain it: `get_test_cycles_for_issue` → `list_executions_by_cycle` → `update_test_execution`. Pass `"resolve_keys": false` to skip the per-cycle key/name lookup and return raw IDs only. **Cloud only.**
 
 ## Authentication
 

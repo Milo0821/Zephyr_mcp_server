@@ -467,6 +467,83 @@ export const toolSchemas = [
     },
   },
   {
+    name: 'update_test_execution',
+    description: 'Update a test case execution\'s status within a test cycle, and optionally attach bug(s) as Jira issue links. Identify the execution either by execution_id directly, or by test_cycle_key + test_case_key (the latest execution is used). Cloud only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        execution_id: {
+          type: 'string',
+          description: 'Test execution key or ID (e.g. "PROJ-E123" or 5805255). Takes precedence over test_cycle_key/test_case_key.',
+        },
+        test_cycle_key: {
+          type: 'string',
+          description: 'Test cycle key (e.g. "PROJ-R123"). Used together with test_case_key to locate the execution when execution_id is not given.',
+        },
+        test_case_key: {
+          type: 'string',
+          description: 'Test case key (e.g. "PROJ-T456"). Used together with test_cycle_key to locate the execution.',
+        },
+        project_key: {
+          type: 'string',
+          description: 'Project key for the cycle lookup (optional — derived from test_cycle_key when omitted).',
+        },
+        status: {
+          type: 'string',
+          description: 'New execution status name. Common values: "Pass", "Fail", "In Progress", "Blocked", "Not Executed". Must match a status configured in your Zephyr project.',
+        },
+        comment: {
+          type: 'string',
+          description: 'Comment against the overall execution (e.g. failure details).',
+        },
+        environment: {
+          type: 'string',
+          description: 'Environment name assigned to the execution (e.g. "Chrome Latest Version").',
+        },
+        execution_time: {
+          type: 'number',
+          description: 'Actual execution time in milliseconds (optional).',
+        },
+        actual_end_date: {
+          type: 'string',
+          description: 'Actual end date in ISO format, e.g. "2024-05-20T13:15:13Z" (optional).',
+        },
+        executed_by_id: {
+          type: 'string',
+          description: 'Jira Account ID of the user who executed the test (optional).',
+        },
+        assigned_to_id: {
+          type: 'string',
+          description: 'Jira Account ID of the user the execution is assigned to (optional).',
+        },
+        bug_keys: {
+          type: 'array',
+          description: 'Jira issue keys to attach to the execution as bugs (e.g. ["PROJ-789"]). Each key is resolved to a numeric ID via the Jira REST API (requires JIRA_USERNAME + JIRA_API_TOKEN) and linked via POST /testexecutions/{key}/links/issues. Failures are reported as warnings and do not fail the call.',
+          items: { type: 'string' },
+        },
+      },
+    },
+  },
+  {
+    name: 'get_test_cycles_for_issue',
+    description: 'Get the Zephyr test cycles linked to a Jira issue (e.g. a story or epic). Calls GET /issuelinks/{issueKey}/testcycles and, by default, resolves each numeric cycle ID to its key (e.g. "PROJ-R123") and name. Use this to discover the test cycle referenced by a Jira ticket, then feed the key into list_executions_by_cycle / update_test_execution. Cloud only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issue_key: {
+          type: 'string',
+          description: 'Jira issue key whose linked test cycles to fetch (e.g. "PROJ-123").',
+        },
+        resolve_keys: {
+          type: 'boolean',
+          description: 'When true (default), resolve each cycle ID to its key + name via GET /testcycles/{id}. Set false to return raw numeric IDs only (faster, no extra calls).',
+          default: true,
+        },
+      },
+      required: ['issue_key'],
+    },
+  },
+  {
     name: 'delete_test_run',
     description: 'Delete a specific test run (Data Center only — not supported on Cloud v2)',
     inputSchema: {

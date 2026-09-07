@@ -102,6 +102,34 @@ export interface ListExecutionsByCycleArgs {
   max_results?: number;
 }
 
+export interface UpdateTestExecutionArgs {
+  /** Direct execution key/ID (e.g. "PROJ-E123" or 5805255). Takes precedence over cycle+case lookup. */
+  execution_id?: string;
+  /** Test cycle key (e.g. "PROJ-R123") — used with test_case_key to locate the execution. */
+  test_cycle_key?: string;
+  /** Test case key (e.g. "PROJ-T456") — used with test_cycle_key to locate the execution. */
+  test_case_key?: string;
+  /** Project key for the cycle lookup. Derived from test_cycle_key when omitted. */
+  project_key?: string;
+  /** New execution status name (e.g. "Pass", "Fail", "In Progress", "Blocked", "Not Executed"). */
+  status?: string;
+  comment?: string;
+  environment?: string;
+  execution_time?: number;
+  actual_end_date?: string;
+  executed_by_id?: string;
+  assigned_to_id?: string;
+  /** Jira issue keys to link to the execution as bugs (e.g. ["PROJ-789"]). Resolved to numeric IDs via the Jira REST API. */
+  bug_keys?: string[];
+}
+
+export interface GetTestCyclesForIssueArgs {
+  /** Jira issue key whose linked test cycles to fetch (e.g. "PROJ-123"). */
+  issue_key: string;
+  /** When true (default), resolve each cycle ID to its key + name via GET /testcycles/{id}. */
+  resolve_keys?: boolean;
+}
+
 export type JiraType = 'cloud' | 'datacenter';
 
 export interface ApiEndpoints {

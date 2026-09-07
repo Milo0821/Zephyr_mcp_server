@@ -11,6 +11,8 @@ import {
   SearchTestRunsArgs,
   GetTestExecutionArgs,
   ListExecutionsByCycleArgs,
+  UpdateTestExecutionArgs,
+  GetTestCyclesForIssueArgs,
   JiraConfig
 } from './types.js';
 import { convertToGherkin, resolveFolderIdByPath, getAccountIdFromApiKey } from './utils.js';
@@ -1256,6 +1258,199 @@ export class ZephyrToolHandlers {
       };
     } catch (error) {
       throw new McpError(ErrorCode.InternalError, `Failed to list executions: ${this.formatError(error)}`);
+    }
+  }
+
+  async updateTestExecution(args: UpdateTestExecutionArgs) {
+    if (this.jiraConfig.type !== 'cloud') {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        'update_test_execution is only supported on Zephyr Scale Cloud. The Data Center API (v1) uses a different test-result model.'
+      );
+    }
+
+    const {
+      execution_id, test_cycle_key, test_case_key, project_key,
+      status, comment, environment, execution_time, actual_end_date,
+      executed_by_id, assigned_to_id, bug_keys,
+    } = args;
+
+    // Resolve which execution to update: explicit execution_id wins, otherwise cycle + test case.
+    let execKey = execution_id;
+    if (!execKey) {
+      if (!test_cycle_key || !test_case_key) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Provide either execution_id, or both test_cycle_key and test_case_key to identify the execution.'
+        );
+      }
+      execKey = await this.resolveExecutionByCycleAndCase(test_cycle_key, test_case_key, project_key);
+    }
+
+    // Build the update payload — the PUT ignores null/undefined and only touches provided fields.
+    const payload: any = {};
+    if (status !== undefined) payload.statusName = status;
+    if (comment !== undefined) payload.comment = comment;
+    if (environment !== undefined) payload.environmentName = environment;
+    if (execution_time !== undefined) payload.executionTime = execution_time;
+    if (actual_end_date !== undefined) payload.actualEndDate = actual_end_date;
+    if (executed_by_id !== undefined) payload.executedById = executed_by_id;
+    if (assigned_to_id !== undefined) payload.assignedToId = assigned_to_id;
+
+    const hasBugs = Array.isArray(bug_keys) && bug_keys.length > 0;
+    if (Object.keys(payload).length === 0 && !hasBugs) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Nothing to update — provide at least one of: status, comment, environment, execution_time, actual_end_date, executed_by_id, assigned_to_id, or bug_keys.'
+      );
+    }
+
+    try {
+      if (Object.keys(payload).length > 0) {
+        await this.axiosInstance.put(`/testexecutions/${execKey}`, payload);
+      }
+
+      // Attach bugs / Jira issues. IssueLinkInput requires a numeric issueId, so resolve each
+      // key via the Jira REST API (needs JIRA_USERNAME + JIRA_API_TOKEN on Cloud), mirroring create_test_case.
+      const linkWarnings: string[] = [];
+      let linkedCount = 0;
+      if (hasBugs) {
+        for (const bugKey of bug_keys!) {
+          try {
+            const issueId = await this.resolveJiraIssueId(bugKey);
+            await this.axiosInstance.post(`/testexecutions/${execKey}/links/issues`, { issueId });
+            linkedCount++;
+          } catch (e) {
+            linkWarnings.push(`${bugKey}: ${this.formatError(e)}`);
+          }
+        }
+      }
+
+      const missingCreds = !process.env.JIRA_USERNAME || !process.env.JIRA_API_TOKEN;
+      const credHint = missingCreds && linkWarnings.length > 0
+        ? '\n💡 Tip: Set JIRA_USERNAME and JIRA_API_TOKEN env vars to enable bug/issue linking on Cloud.'
+        : '';
+      const warningText = linkWarnings.length > 0
+        ? `\n⚠️ Some bug links failed:\n${linkWarnings.map(w => `  - ${w}`).join('\n')}${credHint}`
+        : '';
+
+      return {
+        content: [{
+          type: 'text',
+          text: `✅ Updated test execution ${execKey} successfully.\n${JSON.stringify({
+            executionKey: execKey,
+            status: status ?? '(unchanged)',
+            updatedFields: Object.keys(payload),
+            linkedBugs: linkedCount,
+          }, null, 2)}${warningText}`,
+        }],
+      };
+    } catch (error) {
+      if (error instanceof McpError) throw error;
+      throw new McpError(ErrorCode.InternalError, `Failed to update test execution: ${this.formatError(error)}`);
+    }
+  }
+
+  async getTestCyclesForIssue(args: GetTestCyclesForIssueArgs) {
+    if (this.jiraConfig.type !== 'cloud') {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        'get_test_cycles_for_issue is only supported on Zephyr Scale Cloud. The Data Center API (v1) does not expose issue-link lookups.'
+      );
+    }
+
+    const { issue_key, resolve_keys = true } = args;
+    if (!issue_key) {
+      throw new McpError(ErrorCode.InvalidParams, 'issue_key is required (e.g. "PROJ-123").');
+    }
+
+    try {
+      // GET /issuelinks/{issueKey}/testcycles → TestCycleIdList: [{ id, self }, ...]
+      const response = await this.axiosInstance.get(`/issuelinks/${issue_key}/testcycles`);
+      const raw = Array.isArray(response.data)
+        ? response.data
+        : response.data?.values ?? [];
+
+      const cycleIds: string[] = raw
+        .map((c: any) => c.id ?? c.self?.match(/testcycles\/(\d+)/)?.[1])
+        .filter((id: any) => id !== undefined && id !== null)
+        .map((id: any) => String(id));
+
+      // Optionally resolve each numeric cycle ID to its human-readable key + name.
+      let cycles: any[];
+      if (resolve_keys) {
+        cycles = [];
+        for (const id of cycleIds) {
+          try {
+            const cyc = await this.axiosInstance.get(`/testcycles/${id}`);
+            cycles.push({ id, key: cyc.data?.key ?? null, name: cyc.data?.name ?? null });
+          } catch (e) {
+            cycles.push({ id, key: null, name: null, error: this.formatError(e) });
+          }
+        }
+      } else {
+        cycles = cycleIds.map((id) => ({ id }));
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `✅ Found ${cycles.length} test cycle(s) linked to ${issue_key}:\n${JSON.stringify({
+            issueKey: issue_key,
+            totalCount: cycles.length,
+            testCycles: cycles,
+          }, null, 2)}`,
+        }],
+      };
+    } catch (error) {
+      if (error instanceof McpError) throw error;
+      throw new McpError(ErrorCode.InternalError, `Failed to get test cycles for issue: ${this.formatError(error)}`);
+    }
+  }
+
+  /** Find the latest execution key for a test case within a cycle (Cloud). */
+  private async resolveExecutionByCycleAndCase(
+    cycleKey: string, caseKey: string, projectKey?: string
+  ): Promise<string> {
+    const derivedProject = projectKey || cycleKey.split('-')[0];
+    try {
+      const response = await this.axiosInstance.get('/testexecutions', {
+        params: {
+          projectKey: derivedProject,
+          testCycle: cycleKey,
+          onlyLastExecutions: true,
+          maxResults: 1000,
+        },
+      });
+
+      const executions = Array.isArray(response.data)
+        ? response.data
+        : response.data?.values ?? [];
+
+      const match = executions.find((ex: any) => {
+        const key = ex.testCase?.self?.match(/testcases\/(.+?)\/versions/)?.[1]
+          ?? ex.testCase?.key;
+        return key === caseKey;
+      });
+
+      if (!match) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `No execution found for test case ${caseKey} in cycle ${cycleKey}. Ensure the test case is part of the cycle.`
+        );
+      }
+
+      const execKey = match.key ?? (match.id !== undefined ? String(match.id) : undefined);
+      if (!execKey) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Found a matching execution for ${caseKey} in ${cycleKey} but it has no key or id.`
+        );
+      }
+      return execKey;
+    } catch (error) {
+      if (error instanceof McpError) throw error;
+      throw new McpError(ErrorCode.InternalError, `Failed to resolve execution for ${caseKey} in ${cycleKey}: ${this.formatError(error)}`);
     }
   }
 
